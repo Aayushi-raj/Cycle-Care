@@ -16,6 +16,7 @@ const cycleRoutes = require('./routes/cycle.routes');
 const symptomRoutes = require('./routes/symptom.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const notificationRoutes = require('./routes/notification.routes');
+const aiRoutes = require('./routes/ai.routes');
 
 app.get('/', (req, res) => {
   res.json({ message: 'Welcome to Cycle Care API' });
@@ -26,6 +27,7 @@ app.use('/api/cycles', cycleRoutes);
 app.use('/api/symptoms', symptomRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/ai', aiRoutes);
 
 
 // Error Handling Middleware

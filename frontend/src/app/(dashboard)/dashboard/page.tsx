@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { aiService, EducationalResource } from '@/services/aiService';
 
 interface Insights {
   averageCycleLength: number;
@@ -16,6 +17,39 @@ const DashboardPage = () => {
   const [insights, setInsights] = useState<Insights | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  // Semantic Health Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<EducationalResource[] | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  const handleSemanticSearch = async (queryText?: string) => {
+    const q = queryText !== undefined ? queryText : searchQuery;
+    if (!q.trim()) {
+      setSearchResults(null);
+      return;
+    }
+
+    setSearching(true);
+    setSearchError(null);
+
+    try {
+      const data = await aiService.searchResources(q, token);
+      setSearchResults(data.results);
+    } catch (err: any) {
+      console.error(err);
+      setSearchError('Search service temporarily unavailable');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setSearchResults(null);
+    setSearchError(null);
+  };
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -135,8 +169,9 @@ const DashboardPage = () => {
         <div className="glass-card actions-card">
           <h3>Quick Actions</h3>
           <div className="action-buttons">
-            <button className="btn btn-primary" onClick={() => router.push('/cycles')}>Log New Cycle</button>
-            <button className="btn btn-outline" onClick={() => router.push('/symptoms')}>Log Mood</button>
+            <button className="btn btn-primary" onClick={() => router.push('/assistant')}>AI Assistant ✨</button>
+            <button className="btn btn-secondary" onClick={() => router.push('/cycles')}>Log New Cycle</button>
+            <button className="btn btn-outline" onClick={() => router.push('/symptoms')}>Log Symptoms</button>
           </div>
         </div>
       </div>
@@ -162,27 +197,122 @@ const DashboardPage = () => {
         </div>
       )}
 
-      {/* Wellness Articles Section */}
+      {/* Wellness & Semantic Health Search Section */}
       <div className="wellness-section animate-fade-in">
         <div className="section-header">
-           <h3>Wellness & Resources</h3>
-           <p>Curated guides for a healthier cycle</p>
+           <div className="section-title-wrap">
+             <h3>Semantic Health Knowledge Search 🔍</h3>
+             <p>Search evidence-based clinical guides and cycle wellness resources by everyday meaning</p>
+           </div>
         </div>
-        <div className="articles-grid">
-          {wellnessArticles.map((article, idx) => (
-            <div key={idx} className="glass-card article-card">
-              <div className="article-icon" style={{ backgroundColor: article.bgColor }}>
-                {article.emoji}
-              </div>
-              <div className="article-content">
-                <span className="article-category" style={{ color: article.color }}>{article.category}</span>
-                <h4>{article.title}</h4>
-                <p>{article.excerpt}</p>
-                <a href={article.url} target="_blank" rel="noopener noreferrer" className="read-more-btn" style={{ textDecoration: 'none' }}>Read More &rarr;</a>
-              </div>
+
+        {/* Semantic Search Bar */}
+        <div className="search-bar-wrap glass-card">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSemanticSearch();
+            }}
+            className="search-form"
+          >
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search by concept (e.g., 'what should I eat when bleeding heavily?', 'foods for period cramps', 'how to sleep better')..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <button type="submit" className="btn btn-primary" disabled={searching || !searchQuery.trim()}>
+              {searching ? 'Searching...' : 'Search Guides'}
+            </button>
+            {searchResults && (
+              <button type="button" className="btn btn-outline" onClick={handleClearSearch}>
+                Clear
+              </button>
+            )}
+          </form>
+
+          <div className="sample-searches">
+            <span>Popular topics:</span>
+            {[
+              "what to eat when bleeding heavily",
+              "how to relieve severe cramps",
+              "fatigue and iron loss",
+              "yoga poses for period pain"
+            ].map((topic, i) => (
+              <button
+                key={i}
+                type="button"
+                className="sample-chip"
+                onClick={() => {
+                  setSearchQuery(topic);
+                  handleSemanticSearch(topic);
+                }}
+              >
+                {topic}
+              </button>
+            ))}
+          </div>
+
+          {searchError && <div className="search-error">{searchError}</div>}
+        </div>
+
+        {/* Search Results or Default Curated Guides */}
+        {searchResults ? (
+          <div className="search-results-section animate-fade-in">
+            <div className="results-status">
+              <h4>Matched Resources ({searchResults.length})</h4>
+              <span className="results-badge">Semantic Cosine Similarity</span>
             </div>
-          ))}
-        </div>
+
+            {searchResults.length === 0 ? (
+              <p className="no-results">No specific guides matched that query. Try rephrasing your question.</p>
+            ) : (
+              <div className="articles-grid">
+                {searchResults.map((article, idx) => (
+                  <div key={idx} className="glass-card article-card semantic-card">
+                    <div className="card-badge-row">
+                      <span className="article-category">{article.category}</span>
+                      {article.relevance_score !== undefined && (
+                        <span className="similarity-tag">
+                          {Math.round(article.relevance_score * 100)}% Match
+                        </span>
+                      )}
+                    </div>
+                    <h4>{article.title}</h4>
+                    <p>{article.summary}</p>
+                    {article.tags && article.tags.length > 0 && (
+                      <div className="tags-row">
+                        {article.tags.slice(0, 3).map((tag, tIdx) => (
+                          <span key={tIdx} className="mini-tag">#{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                    <a href={article.url} target="_blank" rel="noopener noreferrer" className="read-more-btn">
+                      Read Guide &rarr;
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="articles-grid">
+            {wellnessArticles.map((article, idx) => (
+              <div key={idx} className="glass-card article-card">
+                <div className="article-icon" style={{ backgroundColor: article.bgColor }}>
+                  {article.emoji}
+                </div>
+                <div className="article-content">
+                  <span className="article-category" style={{ color: article.color }}>{article.category}</span>
+                  <h4>{article.title}</h4>
+                  <p>{article.excerpt}</p>
+                  <a href={article.url} target="_blank" rel="noopener noreferrer" className="read-more-btn" style={{ textDecoration: 'none' }}>Read More &rarr;</a>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <style jsx>{`
@@ -407,6 +537,106 @@ const DashboardPage = () => {
         }
         .read-more-btn:hover {
            color: var(--primary);
+        }
+        .search-bar-wrap {
+          padding: 1.5rem;
+          margin-bottom: 2rem;
+        }
+        .search-form {
+          display: flex;
+          gap: 0.8rem;
+          flex-wrap: wrap;
+        }
+        .search-input {
+          flex: 1;
+          min-width: 280px;
+          padding: 0.8rem 1.2rem;
+          border-radius: 12px;
+          border: 1px solid var(--glass-border);
+          background: rgba(255, 255, 255, 0.8);
+          font-family: inherit;
+          font-size: 0.95rem;
+          outline: none;
+        }
+        .search-input:focus {
+          border-color: var(--primary);
+        }
+        .sample-searches {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          margin-top: 1rem;
+          font-size: 0.82rem;
+          color: var(--text-muted);
+        }
+        .sample-chip {
+          background: rgba(255, 255, 255, 0.7);
+          border: 1px solid var(--glass-border);
+          border-radius: 20px;
+          padding: 0.25rem 0.7rem;
+          font-size: 0.8rem;
+          cursor: pointer;
+          color: var(--foreground);
+          transition: all 0.2s ease;
+        }
+        .sample-chip:hover {
+          background: var(--primary-light);
+          color: white;
+        }
+        .search-error {
+          margin-top: 0.8rem;
+          color: var(--error);
+          font-size: 0.85rem;
+        }
+        .results-status {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1.5rem;
+        }
+        .results-badge {
+          font-size: 0.75rem;
+          background: #dbeafe;
+          color: #1e40af;
+          padding: 0.2rem 0.6rem;
+          border-radius: 14px;
+          font-weight: 600;
+        }
+        .no-results {
+          padding: 2rem;
+          text-align: center;
+          color: var(--text-muted);
+        }
+        .semantic-card {
+          border-top: 4px solid var(--secondary);
+        }
+        .card-badge-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 0.5rem;
+        }
+        .similarity-tag {
+          font-size: 0.75rem;
+          background: #dcfce7;
+          color: #15803d;
+          padding: 0.15rem 0.5rem;
+          border-radius: 12px;
+          font-weight: 700;
+        }
+        .tags-row {
+          display: flex;
+          gap: 0.4rem;
+          flex-wrap: wrap;
+          margin-bottom: 1rem;
+        }
+        .mini-tag {
+          font-size: 0.75rem;
+          color: var(--text-muted);
+          background: rgba(0, 0, 0, 0.04);
+          padding: 0.15rem 0.4rem;
+          border-radius: 6px;
         }
       `}</style>
     </div>

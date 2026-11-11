@@ -49,6 +49,7 @@ const Navbar: React.FC = () => {
               <Link href="/dashboard" className="nav-link">Dashboard</Link>
               <Link href="/cycles" className="nav-link">Cycles</Link>
               <Link href="/symptoms" className="nav-link">Symptoms</Link>
+              <Link href="/assistant" className="nav-link ai-nav-link">AI Assistant ✨</Link>
               <Link href="/profile" className="nav-link">Profile</Link>
               
               <div className="notification-wrapper">
@@ -125,6 +126,19 @@ const Navbar: React.FC = () => {
         .nav-link {
           font-weight: 500;
           color: var(--foreground);
+        }
+        .ai-nav-link {
+          color: var(--primary);
+          font-weight: 600;
+          background: rgba(255, 77, 148, 0.1);
+          padding: 0.3rem 0.8rem;
+          border-radius: 20px;
+          border: 1px solid rgba(255, 77, 148, 0.2);
+          transition: all 0.2s ease;
+        }
+        .ai-nav-link:hover {
+          background: var(--primary);
+          color: white;
         }
         .logo-icon {
             font-size: 1.8rem;
