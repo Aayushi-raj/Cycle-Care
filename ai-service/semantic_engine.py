@@ -1,6 +1,19 @@
+import os
+# Memory & Threading optimizations for cloud container environments (Render 512MB RAM)
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
 import logging
 from typing import List, Dict, Any, Tuple
 import numpy as np
+import torch
+torch.set_num_threads(1)
+torch.set_grad_enabled(False)
+
 from sentence_transformers import SentenceTransformer
 from knowledge_graph import SEED_DATA
 
@@ -9,12 +22,14 @@ logger = logging.getLogger("cyclecare.semantic_engine")
 
 class SemanticEngine:
     def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
-        logger.info(f"Loading SentenceTransformer model: {model_name}...")
+        logger.info(f"Loading SentenceTransformer model on CPU: {model_name}...")
         try:
-            self.model = SentenceTransformer(model_name, local_files_only=True)
+            with torch.inference_mode():
+                self.model = SentenceTransformer(model_name, device="cpu", local_files_only=True)
         except Exception:
-            self.model = SentenceTransformer(model_name)
-        logger.info("SentenceTransformer model loaded successfully.")
+            with torch.inference_mode():
+                self.model = SentenceTransformer(model_name, device="cpu")
+        logger.info("SentenceTransformer model loaded successfully on CPU.")
 
         self.symptom_corpus: List[Dict[str, Any]] = []
         self.symptom_embeddings: np.ndarray = None

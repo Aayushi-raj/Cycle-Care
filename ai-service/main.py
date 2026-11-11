@@ -53,6 +53,15 @@ class RecommendationRequest(BaseModel):
 
 # ------------------ Endpoints ------------------
 
+@app.get("/")
+def root_check():
+    return {
+        "status": "healthy",
+        "service": "CycleCare AI & Knowledge Graph Microservice",
+        "docs": "/docs"
+    }
+
+
 @app.get("/health")
 def health_check():
     return {
@@ -148,4 +157,5 @@ def explore_knowledge_graph(symptom: Optional[str] = None, phase: Optional[str] 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
